@@ -3,15 +3,15 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-
-	gh "github.com/cli/go-gh/v2"
+	"os"
+	"os/exec"
 )
 
 // pr represents a GitHub pull request returned by `gh pr list`.
 type pr struct {
-	Number            int            `json:"number"`
-	Author            prAuthor       `json:"author"`
-	StatusCheckRollup []statusCheck  `json:"statusCheckRollup"`
+	Number            int           `json:"number"`
+	Author            prAuthor      `json:"author"`
+	StatusCheckRollup []statusCheck `json:"statusCheckRollup"`
 }
 
 type prAuthor struct {
@@ -20,6 +20,18 @@ type prAuthor struct {
 
 type statusCheck struct {
 	Conclusion string `json:"conclusion"`
+}
+
+// ghRun executes a gh CLI command, wiring its stderr to os.Stderr.
+func ghRun(args ...string) error {
+	c := exec.Command("gh", args...)
+	c.Stderr = os.Stderr
+	return c.Run()
+}
+
+// ghOutput executes a gh CLI command and returns its stdout.
+func ghOutput(args ...string) ([]byte, error) {
+	return exec.Command("gh", args...).Output()
 }
 
 // isDependabotAuthor reports whether the given login belongs to Dependabot.
@@ -47,13 +59,13 @@ func listDependabotPRs(requirePassingChecks bool) ([]int, error) {
 		fields += ",statusCheckRollup"
 	}
 
-	stdout, _, err := gh.Exec("pr", "list", "--json", fields)
+	out, err := ghOutput("pr", "list", "--json", fields)
 	if err != nil {
 		return nil, fmt.Errorf("listing pull requests: %w", err)
 	}
 
 	var prs []pr
-	if err := json.Unmarshal(stdout.Bytes(), &prs); err != nil {
+	if err := json.Unmarshal(out, &prs); err != nil {
 		return nil, fmt.Errorf("parsing pull request list: %w", err)
 	}
 

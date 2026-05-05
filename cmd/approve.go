@@ -1,47 +1,38 @@
 package cmd
 
 import (
+	"flag"
 	"fmt"
-
-	gh "github.com/cli/go-gh/v2"
-	"github.com/spf13/cobra"
+	"io"
 )
 
-func newApproveCmd() *cobra.Command {
-	var dryRun bool
-
-	cmd := &cobra.Command{
-		Use:   "approve",
-		Short: "Approve all passing Dependabot PRs",
-		Long: `Approve every open Dependabot pull request whose CI checks have
-all succeeded or were skipped (or that have no checks at all).`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			prs, err := listDependabotPRs(true)
-			if err != nil {
-				return err
-			}
-
-			if len(prs) == 0 {
-				fmt.Fprintln(cmd.OutOrStdout(), "No eligible Dependabot PRs found.")
-				return nil
-			}
-
-			for _, number := range prs {
-				prStr := fmt.Sprintf("%d", number)
-				if dryRun {
-					fmt.Fprintf(cmd.OutOrStdout(), "[dry-run] Would approve PR #%d\n", number)
-					continue
-				}
-
-				fmt.Fprintf(cmd.OutOrStdout(), "Approving PR #%d\n", number)
-				if _, _, err := gh.Exec("pr", "review", prStr, "--approve"); err != nil {
-					return fmt.Errorf("approving PR #%d: %w", number, err)
-				}
-			}
-			return nil
-		},
+func runApprove(args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("approve", flag.ContinueOnError)
+	fs.SetOutput(out)
+	dryRun := fs.Bool("dry-run", false, "Print actions without executing them")
+	if err := fs.Parse(args); err != nil {
+		return err
 	}
 
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print actions without executing them")
-	return cmd
+	prs, err := listDependabotPRs(true)
+	if err != nil {
+		return err
+	}
+
+	if len(prs) == 0 {
+		fmt.Fprintln(out, "No eligible Dependabot PRs found.")
+		return nil
+	}
+
+	for _, number := range prs {
+		if *dryRun {
+			fmt.Fprintf(out, "[dry-run] Would approve PR #%d\n", number)
+			continue
+		}
+		fmt.Fprintf(out, "Approving PR #%d\n", number)
+		if err := ghRun("pr", "review", fmt.Sprintf("%d", number), "--approve"); err != nil {
+			return fmt.Errorf("approving PR #%d: %w", number, err)
+		}
+	}
+	return nil
 }
