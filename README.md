@@ -1,5 +1,8 @@
 # gh-dependabot
 
+> [!CAUTION]
+> The repository has been archived in favor of [KnpLabs/gh-dependabot](https://github.com/KnpLabs/gh-dependabot)
+
 A [GitHub CLI](https://cli.github.com/) extension to interact with pull requests opened by Dependabot on GitHub.
 
 ## Requirements
